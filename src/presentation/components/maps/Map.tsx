@@ -1,116 +1,130 @@
-import {Platform} from 'react-native';
-import MapView, {PROVIDER_GOOGLE, Marker, Polyline} from 'react-native-maps';
-import {Location} from '../../../infrastructure/interfaces/location';
-import {FAB} from '../ui/FAB';
-import {useEffect, useRef, useState} from 'react';
-import {useLocationStore} from '../../store/location/useLocationStore';
+import { Platform, View } from 'react-native';
+import MapView, { PROVIDER_GOOGLE, Marker } from 'react-native-maps';
+import { Location } from '../../../infrastructure/interfaces/location';
+import { useEffect, useRef, useState } from 'react';
+import { useLocationStore } from '../../store/location/useLocationStore';
 
 interface Props {
   showsUserLocation?: boolean;
   initialLocation: Location;
+  isLoggedIn: boolean; // Se asume que este prop se pasa desde el proveedor de autenticación
 }
 
-export const Map = ({showsUserLocation = true, initialLocation}: Props) => {
-  const mapRef = useRef<MapView>();
-  const cameraLocation = useRef<Location>(initialLocation);
-  const [isFollowingUser, setIsFollowingUser] = useState(true);
-  const [isShowingPolyline, setIsShowingPolyline] = useState(true);
+export const Map = ({ showsUserLocation = true, initialLocation, isLoggedIn }: Props) => {
+  const mapRef = useRef<MapView>(null);
+  const [isFollowingUser, setIsFollowingUser] = useState(true); // El seguimiento está activo por defecto
+  const [showLocation, setShowLocation] = useState(showsUserLocation);
+  const [userLocation, setUserLocation] = useState<Location | null>(null); // Estado para almacenar la ubicación del usuario
 
   const {
     getLocation,
     lastKnownLocation,
     watchLocation,
     clearWatchLocation,
-    userLocationList,
   } = useLocationStore();
 
+  const zoomLevel = 0.01; // Ajusta el zoom del mapa según tu necesidad
+
   const moveCameraToLocation = (location: Location) => {
-    if (!mapRef.current) return;
-    mapRef.current.animateCamera({center: location});
-  };
-
-  const moveToCurrentLocation = async () => {
-    if (!lastKnownLocation) {
-      moveCameraToLocation(initialLocation);
+    if (mapRef.current) {
+      mapRef.current.animateCamera({
+        center: location,
+        zoom: 18, // Ajuste de zoom
+      });
     }
-    const location = await getLocation();
-    if (!location) return;
-    moveCameraToLocation(location);
   };
 
+  // Obtener ubicación inmediatamente al iniciar el componente
   useEffect(() => {
-    watchLocation();
+    const fetchInitialLocation = async () => {
+      const location = await getLocation();
+      if (location) {
+        console.log('Ubicación inicial obtenida:', location); // Muestra las coordenadas obtenidas
+        setUserLocation(location); // Guarda la ubicación en el estado
+        moveCameraToLocation(location); // Mover la cámara a la nueva ubicación inmediatamente
+      }
+    };
+
+    fetchInitialLocation(); // Llamar a la función para obtener la ubicación inmediatamente
+
+    // Obtener ubicación automáticamente cada 10 segundos
+    const locationInterval = setInterval(async () => {
+      const location = await getLocation();
+      if (location) {
+        console.log('Ubicación actualizada:', location); // Muestra las coordenadas obtenidas cada 10 segundos
+        setUserLocation(location); // Actualiza la ubicación en el estado
+        moveCameraToLocation(location); // Mover la cámara a la nueva ubicación
+      }
+    }, 10000); // Actualizamos cada 10 segundos
 
     return () => {
-      clearWatchLocation();
+      clearInterval(locationInterval); // Limpiar el intervalo al desmontar
+      clearWatchLocation(); // Limpiar observador de ubicación
     };
   }, []);
 
+  // Este useEffect se encarga de manejar el estado de seguimiento de la ubicación
+  useEffect(() => {
+    if (isLoggedIn) {
+      setShowLocation(true); // Mostrar ubicación cuando el usuario está autenticado
+      watchLocation();
+    } else {
+      setShowLocation(false); // Ocultar ubicación cuando no está autenticado
+      clearWatchLocation(); // Limpiar la ubicación cuando no es necesario
+    }
+
+    return () => {
+      clearWatchLocation(); // Limpiar los observadores de ubicación al desmontar
+    };
+  }, [isLoggedIn]); // Este efecto se dispara cada vez que cambia el estado de isLoggedIn
+
+  // Este useEffect es necesario para mover la cámara a la última ubicación conocida cuando cambia
   useEffect(() => {
     if (lastKnownLocation && isFollowingUser) {
-      moveCameraToLocation(lastKnownLocation);
+      console.log('Última ubicación conocida:', lastKnownLocation); // Muestra las coordenadas de la última ubicación conocida
+      setUserLocation(lastKnownLocation); // Actualiza la ubicación en el estado
+      moveCameraToLocation(lastKnownLocation); // Mueve la cámara a la ubicación actual
     }
   }, [lastKnownLocation, isFollowingUser]);
 
   return (
-    <>
+    <View style={{ flex: 1 }}>
       <MapView
-        ref={map => (mapRef.current = map!)}
-        showsUserLocation={showsUserLocation}
-        provider={Platform.OS === 'ios' ? undefined : PROVIDER_GOOGLE} // remove if not using Google Maps
-        style={{flex: 1}}
-        onTouchStart={() => setIsFollowingUser(false)}
-        region={{
-          latitude: cameraLocation.current.latitude,
-          longitude: cameraLocation.current.longitude,
-          latitudeDelta: 0.015,
-          longitudeDelta: 0.0121,
-        }}>
-        {isShowingPolyline && (
-          <Polyline
-            coordinates={userLocationList}
-            strokeColor="black"
-            strokeWidth={5}
+        ref={mapRef}
+        showsUserLocation={showLocation} // Aquí se asegura que se muestre la ubicación del usuario
+        followsUserLocation={isFollowingUser} // Asegura que el mapa siga al usuario
+        provider={Platform.OS === 'ios' ? undefined : PROVIDER_GOOGLE}
+        style={{ flex: 1 }}
+        initialRegion={{
+          latitude: initialLocation.latitude, // Usamos la latitud de initialLocation
+          longitude: initialLocation.longitude, // Usamos la longitud de initialLocation
+          latitudeDelta: 0.01, // Ajuste del zoom en el eje latitud
+          longitudeDelta: 0.01, // Ajuste del zoom en el eje longitud
+        }}
+        onTouchStart={() => setIsFollowingUser(false)} // Evita que el mapa se mueva al tocarlo
+        onRegionChangeComplete={(region) => {
+          if (!isFollowingUser) {
+            // Si no estamos siguiendo al usuario, se actualiza la ubicación manualmente
+            moveCameraToLocation(region); 
+          }
+        }}
+        scrollEnabled={false} // Deshabilita el desplazamiento
+  zoomEnabled={false} // Deshabilita el zoom
+  rotateEnabled={false} // Deshabilita la rotación
+  pitchEnabled={false} // Deshabilita la inclinación
+      >
+        {/* Agregar el marcador para mostrar la ubicación */}
+        {userLocation && (
+          <Marker
+            coordinate={{
+              latitude: userLocation.latitude,
+              longitude: userLocation.longitude,
+            }}
+            title="Ubicación actual"
+            description="Esta es la ubicación actual del usuario"
           />
         )}
-
-        {/* <Marker 
-            coordinate={{
-              latitude: 37.78825,
-              longitude: -122.4324,
-            }}
-            title="Este es el título del marcador"
-            description="Este es el cuerpo del marcador"
-            image={ require('../../../assets/marker.png') }
-          /> */}
       </MapView>
-
-      <FAB
-        iconName={isShowingPolyline ? 'eye-outline' : 'eye-off-outline'}
-        onPress={() => setIsShowingPolyline(!isShowingPolyline)}
-        style={{
-          bottom: 140,
-          right: 20,
-        }}
-      />
-
-      <FAB
-        iconName={isFollowingUser ? 'walk-outline' : 'accessibility-outline'}
-        onPress={() => setIsFollowingUser(!isFollowingUser)}
-        style={{
-          bottom: 80,
-          right: 20,
-        }}
-      />
-
-      <FAB
-        iconName="compass-outline"
-        onPress={moveToCurrentLocation}
-        style={{
-          bottom: 20,
-          right: 20,
-        }}
-      />
-    </>
+    </View>
   );
 };

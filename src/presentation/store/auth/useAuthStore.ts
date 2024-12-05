@@ -3,6 +3,7 @@ import { AuthStatus } from '../../../infrastructure/interfaces/auth.status';
 import { User } from '../../../domain/entities/User';
 import { StorageAdapter } from '../../../config/adapters/storage-adapter';
 import { authCheckStatus, authLogin } from '../../../actions/auth/auth';
+import { useLocationStore } from '../../store/location/useLocationStore';  // Importa el store de ubicación
 
 export interface AuthState {
   status: AuthStatus;
@@ -43,5 +44,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   logout: async () => {
     await StorageAdapter.removeItem('token');
     set({ status: 'unauthenticated', token: undefined, user: undefined });
+
+    
   },
 }));
