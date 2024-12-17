@@ -11,6 +11,7 @@ import { AuthProvider } from './presentation/providers/AuthProvider';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PermissionsChecker } from './presentation/providers/PermissionsChecker';
+import { NavigationController } from './presentation/providers/NavigationController';
 
 const queryClient = new QueryClient();
 
@@ -26,7 +27,7 @@ export const MapsApp = () => {
     <QueryClientProvider client={queryClient}>
       <IconRegistry icons={EvaIconsPack} />
       <ApplicationProvider {...eva} theme={theme} customMapping={eva.mapping}>
-      <NavigationContainer
+        <NavigationContainer
           theme={{
             dark: colorScheme === 'dark',
             colors: {
@@ -46,7 +47,7 @@ export const MapsApp = () => {
           }}>
           <AuthProvider>
             <PermissionsChecker>
-              <StackNavigator />
+                <StackNavigator />
             </PermissionsChecker>
           </AuthProvider>
         </NavigationContainer>

@@ -2,7 +2,7 @@ export interface User {
     correo: string;
     password:string;
     exp: string;
-    rol: string[];
+    rol: number[];
     id: number;
     turno: string;
     isActive: number;

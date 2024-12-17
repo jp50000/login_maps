@@ -14,6 +14,7 @@ export type RootTabParams = {
 
 const Tab = createBottomTabNavigator<RootTabParams>();
 
+
 export const BottomTabsNavigator2 = () => {
   return (
     <Tab.Navigator

@@ -39,7 +39,7 @@ export const authLogin = async (correo: string, password: string) => {
       correo,
       password,
     });
-    //console.log('authLogin response:', data); // Log para verificar respuesta
+    console.log('authLogin response:', data); // Log para verificar respuesta
     return returnUserToken(data);
   } catch (error) {
     console.log('authLogin error:', error); // Log para verificar errores
